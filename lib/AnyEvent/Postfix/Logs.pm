@@ -23,9 +23,10 @@ Perhaps a little code snippet.
     my $cv = AnyEvent->condvar;
 
     AnyEvent::Postfix::Logs->new(
-        fh => \*STDIN,
+        sources   => [ \*STDIN ],
         on_mail   => sub { say "Mail from $_[0]->{from} to ", join(", ", @{ $_[0]->{to} } ) },
-        on_finish => sub { $cv->send() },
+        on_finish => sub { say "No more mail"; $cv->send() },
+        on_error  => sub { croak $_[0] },
     );
 
     # do some more stuff
@@ -38,29 +39,57 @@ Perhaps a little code snippet.
 use AnyEvent;
 use AnyEvent::Handle;
 
+use Carp;
+use Scalar::Util qw(refaddr);
+
 sub new {
     my ($class, %args) = @_;
     my $self = bless { }, $class;
 
     $self->{on_mail}   = delete $args{on_mail}   || sub { };
     $self->{on_finish} = delete $args{on_finish} || sub { };
-
-    $self->{fh}        = delete $args{fh} || die "Need an filehandle";
+    $self->{on_error}  = delete $args{on_error}  || sub { croak $_[0] };
 
     $self->{messages}  = { };
-
-    $self->{handle} = AnyEvent->io(
-        fh     => $self->{fh},
-        poll   => 'r',
-        cb     => sub { $self->parseline },
-    );
+    $self->add_source( @{ delete $args{sources} || [ ] } );
 
     return $self;
 }
 
+sub add_source {
+    my ($self, @sources) = @_;
+
+    for my $file ( @sources ) {
+        unless ( ref $file ) {
+            # Assume it's a file name
+            my $filename = $file;
+            
+            $file = undef;
+            open $file, "<", $filename
+                or $self->{on_error}->("Couldn't open $filename: $!");
+        }
+        
+        my $handle = AnyEvent::Handle->new (
+            fh => $file,
+        );
+
+        $handle->push_read( line => sub { $self->parseline( @_ ) } );
+        $handle->on_error( sub { 
+            my ($handle, $fatal, $message) = @_;
+
+            delete $self->{handles}->{refaddr $handle} if $fatal;
+            $self->{on_error}->($message) unless eof( $handle->fh );
+            $self->{on_finish}->()        unless keys %{ $self->{handles} };
+        });
+
+        $self->{handles}->{refaddr $handle} = $handle;
+    }
+
+    return 1; 
+}
+
 sub parseline {
-    my $self = shift;
-    my $line = readline $self->{fh};
+    my ($self, $handle, $line) = @_;
 
     if ( $line =~ m!^(\w\w\w \d\d \d\d:\d\d:\d\d) (\w+) postfix/(\w+)\[\d+\]: ([0-9A-F]+): (.*)! ) {
         my ($time, $server, $cmd, $id, $line) = ($1, $2, $3, $4, $5);
@@ -87,10 +116,7 @@ sub parseline {
 
     }
 
-    if ( eof $self->{fh} ) {
-        $self->{handle} = undef;
-        $self->{on_finish}->();
-    }
+    $handle->push_read( line => sub { $self->parseline( @_ ) } );
 }
 
 =head1 AUTHOR
