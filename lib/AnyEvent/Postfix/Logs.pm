@@ -95,14 +95,14 @@ sub parseline {
         my ($time, $server, $cmd, $id, $line) = ($1, $2, $3, $4, $5);
 
         # Find the message or create a fresh message hash
-        my $mail = $self->{messages}->{$id} ||= { id => $id, time => $1, to => [ ] };
+        my $mail = $self->{messages}->{$server, $id} ||= { id => $id, time => $1, server => $2, to => [ ] };
 
         if ( $cmd eq 'qmgr' ) {
 
             if ($line =~ /^removed$/) {
 
                 $self->{on_mail}->($mail);
-                delete $self->{messages}->{$id};
+                delete $self->{messages}->{$server, $id};
 
             } else {
                 $mail->{from} = $1 if $line =~ /^from=<([^>]+)>/;
