@@ -14,10 +14,6 @@ our $VERSION = '0.01';
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
-
     use AnyEvent::Postfix::Logs;
 
     my $cv = AnyEvent->condvar;
@@ -33,6 +29,62 @@ Perhaps a little code snippet.
 
     $cv->recv;
     ...
+
+=head1 DESCRIPTION
+
+This module implement parsing of postfix log files from multiple sources. Each
+time a mail is removed from postfix' queue a callback is invoked with
+collected information about the mail.
+
+B<Warning:> This module is developen on an need to do basis for ad
+hoc-problems. Do not expect it to be a complete implementation, but if you
+need adtional features pleaes submit a bug. 
+
+=head1 METHODS
+
+=head2 new
+
+Creates a new instance of a C<AnyEvent::Postfix::Logs> module
+
+=head3 PARAMETERS
+
+=over 4
+
+=item sources (array of sources) 
+
+Valid sources are perl file handles or names of log files
+
+=item on_mail (callback)
+
+Reference to a handler to called for each mail fully completed by postfix.  It
+vill be invoked as
+
+    $on_mail->($mail)
+
+where C<$mail> is a hashref with keys like C<from> (string), C<to> (array of
+strings), C<time> (string), C<size> (integer), C<delay> (decimal point), and
+C<msgid> (string).
+
+=item on_finish (callback)
+
+Reference to a handler called when all sources are depleted. It will be
+invoked as
+
+    $on_finish->()
+
+=item on_error (callback)
+
+Reference to a handler called when an error occurs. It will be invoked as
+
+    $on_error->($message)
+
+Default is to croak
+
+=back
+
+=head2 add_source
+
+Add a list of additional sources
 
 =cut
 
