@@ -106,12 +106,14 @@ sub parseline {
 
             } else {
                 $mail->{from} = $1 if $line =~ /^from=<([^>]+)>/;
+                $mail->{size} = $1 if $line =~ /size=(\d+)/;
             }
 
         } elsif ( $cmd eq 'cleanup' ) {
             $mail->{msgid} = $1 if $line =~ /^message-id=(<[^>]+>)/;
         } elsif ( $cmd eq 'virtual' ) {
-            push @{ $mail->{to} }, $1 if $line =~/^to=<([^>]+)>/
+            push @{ $mail->{to} }, $1 if $line =~/^to=<([^>]+)>/;
+            $mail->{delay} = $1 if $line =~ /delay=(\d+\.\d+)/;
         }
 
     }
